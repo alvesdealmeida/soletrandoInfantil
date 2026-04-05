@@ -1,0 +1,299 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Soletre com Formas - Arrastar e Coletar</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary: #6C5CE7; --danger: #FF7675; --success: #27AE60;
+            --warning: #FDCB6E; --tempo: #FFD32A;
+            --bg-top: #A29BFE; --bg-bottom: #55E6C1;
+        }
+        * { touch-action: none; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Nunito', sans-serif;
+            margin: 0; background: #1a1a1d;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden;
+        }
+
+        #desktop-warning {
+            display: none; color: white; text-align: center; padding: 20px; font-family: 'Fredoka One';
+        }
+
+        @media (min-width: 1025px) {
+            .game-container { display: none !important; }
+            #desktop-warning { display: block; }
+        }
+
+        .game-container {
+            width: 100vw; height: 100vh; max-width: 450px; max-height: 850px;
+            position: relative; background: linear-gradient(to bottom, var(--bg-top), var(--bg-bottom));
+            display: flex; flex-direction: column; overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+        .header { width: 90%; margin: 10px auto; padding: 12px; background: white; border-radius: 15px; z-index: 10; pointer-events: none; }
+        .stats-bar { display: flex; justify-content: space-between; align-items: center; font-family: 'Fredoka One'; font-size: 14px; }
+        .timer-bg { width: 100%; height: 12px; background: #eee; border-radius: 10px; margin-top: 10px; overflow: hidden; border: 1px solid #ddd; }
+        #timer-fill { width: 100%; height: 100%; background: var(--tempo); transition: width 0.2s linear; }
+        #word-display { text-align: center; font-family: 'Fredoka One'; color: var(--primary); margin: 10px 0; font-size: 16px; text-transform: uppercase; }
+        .slots-area { min-height: 55px; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; padding: 10px; background: rgba(255,255,255,0.2); border-radius: 10px; }
+        .slot { width: 30px; height: 36px; background: white; border: 2px solid var(--primary); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-family: 'Fredoka One'; font-size: 18px; color: var(--primary); }
+        .slot.space { width: 12px; border: none; background: rgba(0,0,0,0.1); }
+        
+        .keyboard { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 10px; background: white; border-radius: 20px 20px 0 0; display: none; z-index: 20; margin-top: auto; touch-action: manipulation; }
+        .k-btn { aspect-ratio: 1; border: none; color: white; font-family: 'Fredoka One'; font-size: 14px; border-radius: 8px; cursor: pointer; }
+        .k-special { grid-column: span 3; background: #95a5a6 !important; font-size: 10px; height: 45px; }
+        .k-space { grid-column: span 1; background: #bdc3c7 !important; font-size: 8px; }
+        
+        canvas { position: absolute; top: 0; left: 0; z-index: 1; }
+        .modal { position: absolute; inset: 0; background: rgba(255,255,255,0.96); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 100; text-align: center; padding: 20px; }
+        .btn-main { padding: 15px 35px; background: var(--success); color: white; border: none; border-radius: 12px; font-family: 'Fredoka One'; font-size: 18px; margin-top: 20px; cursor: pointer; touch-action: manipulation; }
+    </style>
+</head>
+<body>
+
+<div id="desktop-warning">
+    <h1>📱 Use o Celular</h1>
+    <p>O Nível 1 requer arrastar o dedo na tela!</p>
+</div>
+
+<div class="game-container" id="game-ui">
+    <div class="header">
+        <div class="stats-bar">
+            <span id="lvl-tag" style="background:var(--primary); color:white; padding:3px 10px; border-radius:8px;">NÍVEL 1</span>
+            <span>PTS: <span id="score-txt">0</span></span>
+        </div>
+        <div class="timer-bg"><div id="timer-fill"></div></div>
+        <div id="word-display">COLETE: <span id="target-word">...</span></div>
+        <div class="slots-area" id="slots-area"></div>
+    </div>
+    <canvas id="canvas"></canvas>
+    <div class="keyboard" id="keyboard"></div>
+
+    <div id="modal-win" class="modal">
+        <h1 style="font-family:'Fredoka One'; color:var(--primary); font-size: 32px;">BOA! 🌟</h1>
+        <p id="modal-msg"></p>
+        <button class="btn-main" onclick="nextLevel()">PRÓXIMO NÍVEL</button>
+    </div>
+    <div id="modal-over" class="modal">
+        <h1 style="font-family:'Fredoka One'; color:var(--danger)">TEMPO ESGOTADO</h1>
+        <button class="btn-main" onclick="resetGame()">TENTAR DE NOVO</button>
+    </div>
+    <div id="modal-final" class="modal">
+        <h1 style="font-family:'Fredoka One'; color:var(--success); font-size: 40px;">INCRÍVEL! 🎉</h1>
+        <p>Você dominou todas as letras!</p>
+        <button class="btn-main" onclick="resetGame()">REINICIAR</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const ui = document.getElementById('game-ui');
+    
+    let level = 1, score = 0, timeLeft = 100, active = false, currentWord = "", typed = "", blocks = [];
+    let wordList = [], wordsCompletedInLevel = 0;
+    let fingerX = -100, fingerY = -100, isDragging = false;
+
+    const data = {
+        1: ["BOLA", "CASA", "SOL", "DADO"],
+        2: ["PIPOCA", "BANANA", "ESCOLA", "AMIGO"],
+        3: ["O SOL BRILHA", "EU AMO LER", "BOLA AZUL"]
+    };
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        if (type === 'hit') {
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        } else if (type === 'error') {
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+        } else if (type === 'level') {
+            [440, 554, 659].forEach((f, i) => {
+                const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                o.connect(g); g.connect(audioCtx.destination);
+                o.frequency.setValueAtTime(f, audioCtx.currentTime + i * 0.1);
+                g.gain.setValueAtTime(0.1, audioCtx.currentTime + i * 0.1);
+                o.start(audioCtx.currentTime + i * 0.1); o.stop(audioCtx.currentTime + i * 0.1 + 0.3);
+            });
+        }
+    }
+
+    function initKeyboard() {
+        const kb = document.getElementById('keyboard');
+        kb.innerHTML = '';
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('').forEach((l, i) => {
+            const b = document.createElement('button');
+            b.className = 'k-btn';
+            b.style.backgroundColor = ['#FF7675', '#74B9FF', '#FDCB6E', '#6C5CE7', '#55E6C1'][i % 5];
+            b.textContent = l; b.onclick = () => handleInput(l); kb.appendChild(b);
+        });
+        const spc = document.createElement('button');
+        spc.className = 'k-btn k-space'; spc.textContent = '⎵';
+        spc.onclick = () => handleInput(' '); kb.appendChild(spc);
+        const del = document.createElement('button');
+        del.className = 'k-btn k-special'; del.textContent = 'APAGAR';
+        del.onclick = () => { typed = typed.slice(0, -1); updateSlots(); }; kb.appendChild(del);
+    }
+
+    function handleInput(char) {
+        if (!active) return;
+        if (char === currentWord[typed.length]) {
+            typed += char; score += 10; timeLeft = Math.min(100, timeLeft + 8);
+            playSound('hit'); updateSlots();
+            document.getElementById('score-txt').textContent = score;
+            if (typed === currentWord) checkProgress();
+        } else {
+            timeLeft -= 5; playSound('error');
+        }
+    }
+
+    function updateSlots() {
+        const area = document.getElementById('slots-area');
+        area.innerHTML = '';
+        typed.split('').forEach(c => {
+            const d = document.createElement('div');
+            d.className = c === ' ' ? 'slot space' : 'slot';
+            d.textContent = c === ' ' ? '' : c; area.appendChild(d);
+        });
+    }
+
+    function checkProgress() {
+        active = false; wordsCompletedInLevel++;
+        if (wordsCompletedInLevel >= 2) {
+            if (level < 3) {
+                playSound('level'); confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                setTimeout(() => {
+                    document.getElementById('modal-msg').textContent = level === 1 ? "Muito bem! Agora use o teclado!" : "Prepare-se para as frases!";
+                    document.getElementById('modal-win').style.display = 'flex';
+                }, 800);
+            } else {
+                playSound('level');
+                const end = Date.now() + 3000;
+                (function frame() {
+                    confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 } });
+                    confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 } });
+                    if (Date.now() < end) requestAnimationFrame(frame);
+                }());
+                setTimeout(() => { document.getElementById('modal-final').style.display = 'flex'; }, 1000);
+            }
+        } else {
+            setTimeout(pickWord, 800);
+        }
+    }
+
+    function nextLevel() {
+        level++; wordsCompletedInLevel = 0;
+        document.getElementById('modal-win').style.display = 'none';
+        document.getElementById('lvl-tag').textContent = "NÍVEL " + level;
+        if (level >= 2) { document.getElementById('keyboard').style.display = 'grid'; canvas.style.display = 'none'; }
+        wordList = [...data[level]].sort(() => Math.random() - 0.5);
+        timeLeft = 100; pickWord();
+    }
+
+    function pickWord() {
+        if (wordList.length === 0) wordList = [...data[level]].sort(() => Math.random() - 0.5);
+        currentWord = wordList.pop(); typed = ""; active = true;
+        document.getElementById('target-word').textContent = currentWord;
+        updateSlots();
+    }
+
+    function resetGame() {
+        level = 1; score = 0; timeLeft = 100; wordsCompletedInLevel = 0; blocks = [];
+        document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+        document.getElementById('keyboard').style.display = 'none';
+        canvas.style.display = 'block';
+        document.getElementById('lvl-tag').textContent = "NÍVEL 1";
+        document.getElementById('score-txt').textContent = "0";
+        wordList = [...data[1]].sort(() => Math.random() - 0.5);
+        pickWord();
+    }
+
+    class Block {
+        constructor(char) {
+            this.char = char;
+            this.x = Math.random() * (canvas.width - 60) + 30;
+            this.y = -50;
+            this.speed = 1.2 + (Math.random() * 0.8);
+            this.color = ['#FF7675', '#74B9FF', '#FDCB6E', '#6C5CE7', '#55E6C1'][Math.floor(Math.random()*5)];
+            this.radius = 22;
+        }
+        update() { if (active) this.y += this.speed; }
+        draw() {
+            ctx.fillStyle = this.color; ctx.beginPath();
+            ctx.roundRect(this.x - 20, this.y - 20, 40, 40, 8); ctx.fill();
+            ctx.fillStyle = "white"; ctx.font = "bold 20px Arial";
+            ctx.textAlign = "center"; ctx.fillText(this.char, this.x, this.y + 7);
+        }
+    }
+
+    function loop() {
+        if (level === 1) {
+            ctx.clearRect(0,0,canvas.width, canvas.height);
+            // Desenha o "Comedor" (círculo no dedo)
+            if (isDragging) {
+                ctx.lineWidth = 3; ctx.strokeStyle = 'white';
+                ctx.beginPath(); ctx.arc(fingerX, fingerY, 25, 0, Math.PI*2); ctx.stroke();
+                ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fill();
+            }
+            blocks.forEach((b, i) => {
+                b.update(); b.draw();
+                // Detecção de colisão (Comer a letra)
+                if (isDragging && Math.hypot(fingerX - b.x, fingerY - b.y) < 40) {
+                    handleInput(b.char); blocks.splice(i, 1);
+                }
+                if (b.y > canvas.height + 50) blocks.splice(i,1);
+            });
+        }
+        if (active) {
+            timeLeft -= (level === 3 ? 0.02 : 0.04); 
+            document.getElementById('timer-fill').style.width = timeLeft + "%";
+            if (timeLeft <= 0) { active = false; document.getElementById('modal-over').style.display = 'flex'; playSound('error'); }
+        }
+        requestAnimationFrame(loop);
+    }
+
+    // Controles de Arrastar (Nível 1)
+    canvas.addEventListener('touchstart', (e) => {
+        isDragging = true;
+        const rect = canvas.getBoundingClientRect();
+        fingerX = e.touches[0].clientX - rect.left;
+        fingerY = e.touches[0].clientY - rect.top;
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        const rect = canvas.getBoundingClientRect();
+        fingerX = e.touches[0].clientX - rect.left;
+        fingerY = e.touches[0].clientY - rect.top;
+    });
+
+    canvas.addEventListener('touchend', () => { isDragging = false; });
+
+    setInterval(() => {
+        if (level === 1 && active) {
+            const need = currentWord[typed.length];
+            const char = Math.random() > 0.4 ? need : String.fromCharCode(65 + Math.floor(Math.random()*26));
+            blocks.push(new Block(char));
+        }
+    }, 900);
+
+    window.addEventListener('resize', () => { canvas.width = ui.offsetWidth; canvas.height = ui.offsetHeight; });
+    canvas.width = ui.offsetWidth; canvas.height = ui.offsetHeight;
+    initKeyboard(); resetGame(); loop();
+</script>
+</body>
+</html>
